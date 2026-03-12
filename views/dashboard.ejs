@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ActiveBharat — Biomechanics Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/public/css/dashboard.css">
+  <!-- Dynamic runtime config injected by Express -->
+  <script src="/config.js"></script>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">
+      <h1>Active<span>Bharat</span></h1>
+      <p>Project Eklavya</p>
+    </div>
+    <nav class="nav">
+      <a class="nav-item" href="/">🏠 Overview</a>
+      <a class="nav-item active" href="/dashboard">📡 Live Analysis</a>
+      <a class="nav-item" href="/map">🗺️ Eklavya Map</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="backend-status">
+        <span class="status-dot <%= backendOnline ? 'online' : 'offline' %>"></span>
+        Backend: <%= backendOnline ? 'Online' : 'Offline' %>
+      </div>
+      <div class="api-url"><%= config.API_BASE %></div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <h2>Live Biomechanics</h2>
+        <p class="topbar-sub">Real-time pose analysis powered by Phase 2 Kinematics</p>
+      </div>
+      <div class="topbar-actions">
+        <select id="sport-select" onchange="setSport(this.value)">
+          <option value="vertical_jump">Vertical Jump</option>
+          <option value="sprint">Sprint</option>
+          <option value="squat">Squat</option>
+          <option value="push_up">Push Up</option>
+          <option value="pull_up">Pull Up</option>
+        </select>
+        <button class="btn-primary" onclick="startSession()">▶ Start Session</button>
+        <button class="btn-danger" onclick="endSession()" id="end-btn" style="display:none">■ End</button>
+      </div>
+    </div>
+
+    <!-- Phase 2 Metrics Row -->
+    <div class="metrics-row">
+      <div class="metric-card cyan">
+        <div class="metric-label">Form Score</div>
+        <div class="metric-value" id="form-score">—</div>
+        <div class="metric-sub">/100</div>
+      </div>
+      <div class="metric-card orange">
+        <div class="metric-label">Phase-Space DM</div>
+        <div class="metric-value" id="phase-dm">—</div>
+        <div class="metric-sub">Mahalanobis</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Torsion Error</div>
+        <div class="metric-value" id="torsion-err">—</div>
+        <div class="metric-sub">degrees</div>
+      </div>
+      <div class="metric-card purple">
+        <div class="metric-label">Dimensionless Jerk</div>
+        <div class="metric-value" id="djerk">—</div>
+        <div class="metric-sub">EEI</div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-label">Heart Rate</div>
+        <div class="metric-value" id="heart-rate">—</div>
+        <div class="metric-sub">bpm rPPG</div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <!-- Live Pose Canvas -->
+      <div class="panel canvas-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Live Pose Feed</div>
+            <div class="panel-sub" id="phase-label">Initialise session to begin</div>
+          </div>
+          <div class="status-pill" id="session-status">Idle</div>
+        </div>
+        <canvas id="pose-canvas" width="640" height="480"></canvas>
+        <div class="feedback-banner" id="feedback-banner" style="display:none"></div>
+      </div>
+
+      <!-- Angle Gauges -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Joint Angles</div>
+        </div>
+        <div class="angle-grid">
+          <div class="angle-item">
+            <div class="angle-label">Left Knee</div>
+            <div class="angle-value" id="a-knee-l">—°</div>
+          </div>
+          <div class="angle-item">
+            <div class="angle-label">Right Knee</div>
+            <div class="angle-value" id="a-knee-r">—°</div>
+          </div>
+          <div class="angle-item">
+            <div class="angle-label">Left Hip</div>
+            <div class="angle-value" id="a-hip-l">—°</div>
+          </div>
+          <div class="angle-item">
+            <div class="angle-label">Right Hip</div>
+            <div class="angle-value" id="a-hip-r">—°</div>
+          </div>
+          <div class="angle-item">
+            <div class="angle-label">Spine Lean</div>
+            <div class="angle-value" id="a-spine">—°</div>
+          </div>
+          <div class="angle-item">
+            <div class="angle-label">Left Ankle</div>
+            <div class="angle-value" id="a-ankle-l">—°</div>
+          </div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="panel-header" style="margin-top:24px">
+          <div class="panel-title">Leaderboard</div>
+          <div class="sport-tabs">
+            <button class="sport-tab active" onclick="filterLB('all', this)">All</button>
+            <button class="sport-tab" onclick="filterLB('vertical_jump', this)">Jump</button>
+            <button class="sport-tab" onclick="filterLB('sprint', this)">Sprint</button>
+          </div>
+        </div>
+        <div id="leaderboard-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Runtime config injected server-side via window.AB_CONFIG ──
+    const API_BASE = window.AB_CONFIG?.API_BASE || 'http://localhost:8083/api';
+    const WS_BASE  = window.AB_CONFIG?.WS_BASE  || 'ws://localhost:8082';
+
+    let sessionId = null;
+    let ws        = null;
+    let sport     = 'vertical_jump';
+
+    const ATHLETES = [
+      { name: 'Arjun Patel',  tier: 'Elite',     sport: 'Vertical Jump', bpi: 12450, initials: 'AP' },
+      { name: 'Priya Sharma', tier: 'Advanced',   sport: 'Sprint',        bpi: 11200, initials: 'PS' },
+      { name: 'Rahul Kumar',  tier: 'Elite',      sport: 'Squat',         bpi: 10850, initials: 'RK' },
+      { name: 'Neha Singh',   tier: 'Developing', sport: 'Sprint',        bpi: 9300,  initials: 'NS' },
+    ];
+
+    async function startSession() {
+      try {
+        const r = await fetch(`${API_BASE}/session/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sport, athlete_id: 'web_dashboard' }),
+        });
+        const d = await r.json();
+        sessionId = d.session_id;
+        document.getElementById('session-status').textContent = 'Live';
+        document.getElementById('session-status').className = 'status-pill live';
+        document.getElementById('end-btn').style.display = 'inline-flex';
+        openWebSocket();
+      } catch (e) {
+        alert('Could not connect to backend. Is it running?\n' + API_BASE);
+      }
+    }
+
+    function openWebSocket() {
+      if (!sessionId) return;
+      const wsUrl = `${WS_BASE}/metrics/live/${sessionId}`;
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        document.getElementById('form-score').textContent = d.form_score?.toFixed(1) ?? '—';
+        document.getElementById('phase-dm').textContent   = d.phase_space_dm?.toFixed(3) ?? '—';
+        document.getElementById('torsion-err').textContent = d.torsion_error?.toFixed(1) ?? '—';
+        document.getElementById('djerk').textContent       = d.dimensionless_jerk?.toFixed(4) ?? '—';
+        document.getElementById('heart-rate').textContent = d.heart_rate ?? '—';
+        document.getElementById('a-knee-l').textContent   = d.knee_angle_l ? d.knee_angle_l.toFixed(1) + '°' : '—°';
+        document.getElementById('a-knee-r').textContent   = d.knee_angle_r ? d.knee_angle_r.toFixed(1) + '°' : '—°';
+        document.getElementById('a-hip-l').textContent    = d.hip_angle_l  ? d.hip_angle_l.toFixed(1)  + '°' : '—°';
+        document.getElementById('a-hip-r').textContent    = d.hip_angle_r  ? d.hip_angle_r.toFixed(1)  + '°' : '—°';
+        document.getElementById('a-spine').textContent    = d.spine_lean   ? d.spine_lean.toFixed(1)   + '°' : '—°';
+        document.getElementById('a-ankle-l').textContent  = d.ankle_angle_l ? d.ankle_angle_l.toFixed(1) + '°' : '—°';
+        document.getElementById('phase-label').textContent = d.phase || '';
+        if (d.primary_feedback) {
+          const fb = document.getElementById('feedback-banner');
+          fb.textContent = d.primary_feedback;
+          fb.style.display = 'block';
+        }
+      };
+      ws.onerror = () => console.error('[WS] connection error');
+    }
+
+    async function endSession() {
+      if (!sessionId) return;
+      await fetch(`${API_BASE}/session/${sessionId}/end`, { method: 'POST' });
+      ws?.close();
+      sessionId = null;
+      document.getElementById('session-status').textContent = 'Idle';
+      document.getElementById('session-status').className = 'status-pill';
+      document.getElementById('end-btn').style.display = 'none';
+    }
+
+    function setSport(s) { sport = s; }
+
+    function renderLeaderboard(athletes, filter = 'all') {
+      const list = document.getElementById('leaderboard-list');
+      const sorted = athletes
+        .filter(a => filter === 'all' || a.sport.toLowerCase().includes(filter.split('_')[0]))
+        .sort((a, b) => b.bpi - a.bpi);
+      list.innerHTML = sorted.map((a, i) => `
+        <div class="lb-row">
+          <div class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</div>
+          <div class="lb-avatar">${a.initials}</div>
+          <div class="lb-info"><div class="lb-name">${a.name}</div><div class="lb-sport">${a.tier} · ${a.sport}</div></div>
+          <div class="lb-bpi">${a.bpi.toLocaleString()}</div>
+        </div>`).join('');
+    }
+
+    function filterLB(sport, el) {
+      document.querySelectorAll('.sport-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      renderLeaderboard(ATHLETES, sport);
+    }
+
+    // Init idle canvas
+    window.onload = () => {
+      renderLeaderboard(ATHLETES);
+      const canvas = document.getElementById('pose-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(6,182,212,0.3)';
+      ctx.font = '14px Inter'; ctx.textAlign = 'center';
+      ctx.fillText('Initialise session to start live analysis', canvas.width / 2, canvas.height / 2);
+    };
+  </script>
+</body>
+</html>

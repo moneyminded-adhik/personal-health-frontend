@@ -1,0 +1,16 @@
+body { font-family: 'Inter', system-ui, sans-serif; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+#map { height: 100vh; width: 100vw; z-index: 1; background: #0a0a0c; }
+.ui-layer { position: absolute; z-index: 50; pointer-events: none; }
+.ui-layer > * { pointer-events: auto; }
+.modal-layer { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.modal-layer > * { pointer-events: auto; }
+.avatar-marker { width: 44px; height: 44px; border-radius: 50%; border: 3px solid #f97316;
+  box-shadow: 0 0 15px rgba(249,115,22,0.4); background-size: cover; background-position: center; }
+.leaflet-popup-content-wrapper { background: rgba(24,24,27,0.95); backdrop-filter: blur(8px); color: white;
+  border: 1px solid #3f3f46; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); padding: 0; }
+.leaflet-popup-content { margin: 12px; line-height: 1.4; }
+.leaflet-popup-tip { background: rgba(24,24,27,0.9); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
