@@ -1,0 +1,22 @@
+# ─── Node.js ─────────────────────────────────────────────────────────────────
+# All installed npm packages – restored via npm install
+node_modules/
+
+# ─── Environment / Secrets ───────────────────────────────────────────────────
+.env
+!.env.example
+
+# ─── Build Output ────────────────────────────────────────────────────────────
+# If a build step is ever added (e.g. webpack / esbuild bundles)
+dist/
+build/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
