@@ -1,6 +1,6 @@
 /**
- * ActiveBharat — Dynamic Frontend Service
- * =========================================
+ * Personal Health — Dynamic Frontend Service
+ * ============================================
  * Node.js + Express server that renders all pages server-side using EJS,
  * injects runtime configuration (API URLs, LAN IP), fetches live data from
  * the FastAPI backend before rendering, and proxies API + WebSocket traffic.
@@ -8,7 +8,7 @@
  * Routes:
  *   GET /             → Landing page (index.ejs) — live athlete + session count
  *   GET /dashboard    → Biomechanics dashboard (dashboard.ejs) — injected WS URL
- *   GET /map          → Eklavya GPS Map (map.ejs) — injected backend base
+ *   GET /map          → GPS Map (map.ejs) — injected backend base
  *
  *   GET /config.js    → Dynamic JS blob: window.AB_CONFIG = {...}
  *   GET /api/status   → Proxied health from FastAPI
@@ -17,7 +17,6 @@
  *   ws://.../ws/*     → WebSocket proxy to FastAPI
  *
  * How to run:
- *   cp .env.example .env
  *   npm install
  *   npm start
  */
@@ -28,7 +27,6 @@ require('dotenv').config();
 
 const path   = require('path');
 const http   = require('http');
-const os     = require('os');
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
@@ -36,36 +34,16 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const PROXY_PORT   = parseInt(process.env.PROXY_PORT   || '8083', 10);
 const FASTAPI_PORT = parseInt(process.env.FASTAPI_PORT || '8082', 10);
 const FASTAPI_HOST = process.env.FASTAPI_HOST || 'localhost';
-const PC_IP        = process.env.PC_IP || getLanIP();
 const FASTAPI_URL  = `http://${FASTAPI_HOST}:${FASTAPI_PORT}`;
 const APP_ENV      = process.env.APP_ENV || 'development';
 
-// ── LAN IP Detection ────────────────────────────────────────────────────────
-function getLanIP() {
-    const ifaces = os.networkInterfaces();
-    let fallback = '127.0.0.1';
-    for (const name of Object.keys(ifaces)) {
-        if (/virtual|vbox|loopback|vmware|hyper/i.test(name)) continue;
-        for (const iface of ifaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                if (iface.address.startsWith('172.17.') || iface.address.startsWith('192.168.')) {
-                    return iface.address;
-                }
-                fallback = iface.address;
-            }
-        }
-    }
-    return fallback;
-}
-
 // ── Runtime Config Object (shared across all pages) ─────────────────────────
+// API_BASE is relative so it works from any IP/hostname.
+// WS_BASE is also left empty — views derive it from window.location at runtime.
 function buildConfig() {
     return {
-        API_BASE:    `http://${PC_IP}:${PROXY_PORT}/api`,
-        WS_BASE:     `ws://${FASTAPI_HOST}:${FASTAPI_PORT}`,
-        PC_IP,
+        API_BASE:    '/api',
         PROXY_PORT,
-        FASTAPI_PORT,
         APP_ENV,
     };
 }
@@ -188,11 +166,9 @@ const PAGE_ROUTES = ['/', '/dashboard', '/map', '/public', '/config.js', '/api']
 app.use('/', createProxyMiddleware({
     target: FASTAPI_URL,
     changeOrigin: true,
+    pathFilter: (pathname) => !PAGE_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/')),
     timeout: 20000,
     proxyTimeout: 20000,
-    filter(pathname) {
-        return !PAGE_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/'));
-    },
     on: {
         error(err, req, res) {
             if (err.code === 'ECONNREFUSED') {
@@ -222,20 +198,12 @@ server.on('upgrade', wsProxy.upgrade);
 
 // ── Startup ──────────────────────────────────────────────────────────────────
 server.listen(PROXY_PORT, '0.0.0.0', () => {
-    const ip = PC_IP !== '0.0.0.0' ? PC_IP : getLanIP();
-    console.log('╔══════════════════════════════════════════════════════════╗');
-    console.log('║  ActiveBharat — Frontend Service (Dynamic Node.js)      ║');
-    console.log('╠══════════════════════════════════════════════════════════╣');
-    console.log(`║  Landing:    http://${ip}:${PROXY_PORT}/`);
-    console.log(`║  Dashboard:  http://${ip}:${PROXY_PORT}/dashboard`);
-    console.log(`║  Map:        http://${ip}:${PROXY_PORT}/map`);
-    console.log(`║  API Status: http://${ip}:${PROXY_PORT}/api/status`);
-    console.log(`║  WS Proxy:   ws://${ip}:${PROXY_PORT}/ws/*`);
-    console.log(`║  Backend:    ${FASTAPI_URL}`);
-    console.log('╠══════════════════════════════════════════════════════════╣');
-    console.log('║  Make sure backend is running:                          ║');
-    console.log('║  → cd ../activebharat-backend && python api_server.py   ║');
-    console.log('╚══════════════════════════════════════════════════════════╝');
+    console.log(`\n  Personal Health — Frontend`);
+    console.log(`  ───────────────────────────────────────`);
+    console.log(`  http://localhost:${PROXY_PORT}/`);
+    console.log(`  http://localhost:${PROXY_PORT}/dashboard`);
+    console.log(`  http://localhost:${PROXY_PORT}/map`);
+    console.log(`  Backend: ${FASTAPI_URL}\n`);
 });
 
 server.on('error', (err) => {

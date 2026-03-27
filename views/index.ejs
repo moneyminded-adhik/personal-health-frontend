@@ -3,199 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ActiveBharat | Project Eklavya — Olympic Athletic Ecosystem</title>
-  <meta name="description" content="India's first AI-powered athletic scouting and training ecosystem. From village grounds to Olympic stadiums.">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Personal Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/css/index.css">
-  <!-- Dynamic runtime config: window.AB_CONFIG injected by Express -->
   <script src="/config.js"></script>
 </head>
 <body>
-  <!-- Backend status banner (server-rendered) -->
+
   <% if (!backendOnline) { %>
-  <div class="status-banner offline">
-    ⚠️ Backend is offline — <a href="../activebharat-backend">Start the Python server</a> to enable live features
-  </div>
+  <div class="offline-bar">Backend offline — start the Python server to enable live data</div>
   <% } %>
 
-  <!-- NAVBAR -->
   <nav class="navbar">
     <div class="nav-brand">
-      <div class="nav-logo">AB</div>
-      <div>
-        <div class="nav-title">ActiveBharat</div>
-        <div class="nav-subtitle">Project Eklavya</div>
-      </div>
+      <span class="logo-mark">PH</span>
+      <span class="logo-name">Personal Health</span>
     </div>
     <div class="nav-links">
-      <button class="nav-link active" onclick="showSection('overview')">Overview</button>
-      <button class="nav-link" onclick="showSection('training')">Training</button>
-      <button class="nav-link" onclick="showSection('scouting')">Scouting</button>
-      <button class="nav-link" onclick="showSection('tech')">Technology</button>
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/map" class="nav-link">Map</a>
+      <a href="/api/status" target="_blank" class="nav-link">API</a>
     </div>
     <div class="nav-right">
-      <div class="nav-status">System Live</div>
-      <a href="/dashboard" class="btn-cta">Open Dashboard →</a>
+      <span class="status-dot <%= backendOnline ? 'online' : 'offline' %>"></span>
+      <span class="status-text"><%= backendOnline ? 'Backend online' : 'Offline' %></span>
+      <a href="/dashboard" class="btn-nav">Open Dashboard →</a>
     </div>
   </nav>
 
-  <!-- HERO -->
-  <main class="main">
-    <section id="sec-overview" class="section active">
-      <div class="hero">
-        <div class="hero-tag">🇮🇳 India's Olympic AI Engine</div>
-        <h1 class="hero-title">From Village Grounds<br>to <span class="gradient-text">Olympic Stadiums</span></h1>
-        <p class="hero-sub">Real-time biomechanical analysis · Phase-Space Kinematics · rPPG Biometrics · AI Coaching</p>
-
-        <!-- Live server-side stats -->
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-value"><%= athleteCount > 0 ? athleteCount.toLocaleString() : '—' %></div>
-            <div class="stat-label">Athletes Tracked</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value"><%= activeSessions > 0 ? activeSessions : '—' %></div>
-            <div class="stat-label">Active Sessions</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">60 FPS</div>
-            <div class="stat-label">Analysis Frequency</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">4</div>
-            <div class="stat-label">Phase 2 Algorithms</div>
-          </div>
-        </div>
-
-        <div class="hero-actions">
-          <a href="/dashboard" class="btn-primary">▶ Open Live Dashboard</a>
-          <a href="/map" class="btn-secondary">🗺️ Eklavya Map</a>
-        </div>
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Sports Biomechanics<br><span class="accent">AI Platform</span></h1>
+      <p class="hero-sub">Real-time pose analysis, heart rate monitoring, and session tracking — powered by your phone's camera</p>
+      <div class="hero-actions">
+        <a href="/dashboard" class="btn-primary">Open Dashboard</a>
+        <a href="/map" class="btn-secondary">View Map</a>
       </div>
 
-      <!-- KPI Cards -->
-      <div class="kpi-grid">
-        <div class="kpi-card blue glass">
-          <div class="kpi-label">Phase-Space Analytics</div>
-          <div class="kpi-value">Active</div>
-          <div class="kpi-sub">Mahalanobis Distance · Quaternion Torsion</div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-val mono"><%= athleteCount > 0 ? athleteCount : '0' %></div>
+          <div class="stat-lbl">Athletes</div>
         </div>
-        <div class="kpi-card orange glass">
-          <div class="kpi-label">Inference Engine</div>
-          <div class="kpi-value">MediaPipe</div>
-          <div class="kpi-sub">33 3D landmarks · 60 FPS Edge AI</div>
+        <div class="stat">
+          <div class="stat-val mono"><%= activeSessions > 0 ? activeSessions : '0' %></div>
+          <div class="stat-lbl">Active Sessions</div>
         </div>
-        <div class="kpi-card green glass">
-          <div class="kpi-label">Biomechanics Algo</div>
-          <div class="kpi-value">Phase 2</div>
-          <div class="kpi-sub">Jerk · Phase State Machine · Velocity</div>
-        </div>
-        <div class="kpi-card purple glass">
-          <div class="kpi-label">HF Comms</div>
-          <div class="kpi-value">WebSocket</div>
-          <div class="kpi-sub">60 FPS binary coordinate stream</div>
-        </div>
-      </div>
-
-      <!-- Top athletes (server-rendered from API) -->
-      <% if (topAthletes && topAthletes.length > 0) { %>
-      <div class="leaderboard-section">
-        <h3 class="section-title">🏆 Top Athletes</h3>
-        <div class="lb-list">
-          <% topAthletes.forEach((a, i) => { %>
-          <div class="lb-row">
-            <span class="lb-rank <%= i===0?'gold':i===1?'silver':i===2?'bronze':'' %>"><%= i+1 %></span>
-            <span class="lb-name"><%= a.name %></span>
-            <span class="lb-sport"><%= a.sport %></span>
-            <span class="lb-bpi"><%= (a.bpi||0).toLocaleString() %> BPI</span>
-          </div>
-          <% }); %>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- Architecture overview -->
-      <div class="arch-section">
-        <h3 class="section-title">Architecture</h3>
-        <div class="arch-grid">
-          <div class="arch-card">
-            <div class="arch-icon">📱</div>
-            <div class="arch-title">Android App</div>
-            <div class="arch-desc">React Native · Vision Camera · C++ Frame Processor · 60fps Edge AI</div>
-            <a href="<%= config.PC_IP ? 'http://' + config.PC_IP + ':19000' : 'https://expo.dev' %>" class="arch-link">activebharat-android →</a>
-          </div>
-          <div class="arch-card active">
-            <div class="arch-icon">🌐</div>
-            <div class="arch-title">Web Frontend</div>
-            <div class="arch-desc">Express.js · EJS Server-Side Rendering · Dynamic Config · API Proxy</div>
-            <span class="arch-link active">You are here</span>
-          </div>
-          <div class="arch-card">
-            <div class="arch-icon">⚙️</div>
-            <div class="arch-title">ML Backend</div>
-            <div class="arch-desc">FastAPI · MediaPipe · Phase 2 Kinematics · WebSocket Streaming</div>
-            <a href="<%= config.API_BASE %>/health" target="_blank" class="arch-link">activebharat-backend →</a>
-          </div>
+        <div class="stat">
+          <div class="stat-val mono"><%= backendOnline ? 'Online' : 'Offline' %></div>
+          <div class="stat-lbl">System Status</div>
         </div>
       </div>
     </section>
 
-    <section id="sec-training" class="section">
-      <div class="view-header">
-        <h2>Training Analytics</h2>
-        <p>Powered by Phase 2 <span class="phase-tag">math2.pdf</span> algorithms</p>
+    <!-- What it does -->
+    <section class="features">
+      <div class="feature-card">
+        <div class="feature-icon">📐</div>
+        <h3>Biomechanics Analysis</h3>
+        <p>Real-time joint angle tracking and form scoring from the phone camera using MediaPipe pose estimation. Tracks knee, hip, spine, and ankle angles per frame.</p>
       </div>
-      <div class="feature-grid">
-        <div class="feature-card glass">
-          <h4>📐 Mahalanobis Distance</h4>
-          <p>Compares athlete's phase-space state vector [θ, θ̇] against Olympic-ideal Gaussian distributions. Replaces simplistic if-else angle ranges.</p>
-        </div>
-        <div class="feature-card glass">
-          <h4>🔄 Quaternion Torsion</h4>
-          <p>3D rotational deviation via SciPy spatial transforms. Detects hip and knee torsion invisible to 2D dot-product methods.</p>
-        </div>
-        <div class="feature-card glass">
-          <h4>⚡ Dimensionless Jerk</h4>
-          <p>Energy Efficiency Index from the 3rd derivative of Centre of Mass trajectory. Lower jerk = smoother, more efficient movement.</p>
-        </div>
-        <div class="feature-card glass">
-          <h4>🧠 Phase State Machine</h4>
-          <p>HMM-style phase evaluator that fires different kinematic checks depending on movement phase (descent, bottom, concentric).</p>
-        </div>
+      <div class="feature-card">
+        <div class="feature-icon">❤️</div>
+        <h3>Heart Rate Monitor</h3>
+        <p>Remote photoplethysmography (rPPG) via front camera. Measures BPM and HRV by detecting subtle skin colour changes — no wearable needed.</p>
       </div>
-      <div class="cta-section">
-        <a href="/dashboard" class="btn-primary btn-large">Open Live Dashboard →</a>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Session Tracking</h3>
+        <p>Every workout session is recorded with frame-level data. Form scores, peak jump height, symmetry index, and XP earned are stored per athlete.</p>
       </div>
     </section>
 
-    <section id="sec-tech" class="section">
-      <div class="view-header">
-        <h2>Technology Stack</h2>
+    <!-- Top Athletes — server-rendered from /leaderboard -->
+    <% if (topAthletes && topAthletes.length > 0) { %>
+    <section class="leaderboard">
+      <h2>Top Athletes</h2>
+      <div class="lb-table">
+        <% topAthletes.forEach((a, i) => { %>
+        <div class="lb-row">
+          <span class="lb-rank <%= i===0?'gold':i===1?'silver':i===2?'bronze':'' %>"><%= i + 1 %></span>
+          <span class="lb-avatar"><%= (a.avatar || a.name || '?')[0].toUpperCase() %></span>
+          <div class="lb-info">
+            <div class="lb-name"><%= a.name || a.id %></div>
+            <div class="lb-meta"><%= a.sport || '—' %> · <%= a.tier || 'Athlete' %></div>
+          </div>
+          <span class="lb-bpi mono"><%= (a.bpi || 0).toLocaleString() %> BPI</span>
+        </div>
+        <% }); %>
       </div>
-      <div class="tech-table-wrap glass">
-        <table class="tech-table">
-          <thead><tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr></thead>
-          <tbody>
-            <tr><td>Edge AI</td><td>MediaPipe C++ Tasks API</td><td>GPU 33-landmark extraction at 60 FPS on device</td></tr>
-            <tr><td>Mobile</td><td>React Native + Vision Camera</td><td>Frame Processor with JNI bridge to C++</td></tr>
-            <tr><td>Kinematics</td><td>Python / NumPy / SciPy</td><td>Phase-Space Matrix Math (math2.pdf)</td></tr>
-            <tr><td>API</td><td>FastAPI + WebSockets</td><td>60 FPS metadata stream + REST endpoints</td></tr>
-            <tr><td>Frontend</td><td>Node.js + Express + EJS</td><td>Server-side rendered dynamic web views</td></tr>
-            <tr><td>Transport</td><td>WebSocket (binary)</td><td>528-byte coordinate packets at 60 FPS</td></tr>
-          </tbody>
-        </table>
+      <a href="/dashboard" class="see-all">Full leaderboard in Dashboard →</a>
+    </section>
+    <% } %>
+
+    <!-- System -->
+    <section class="system">
+      <h2>System</h2>
+      <div class="system-grid">
+        <div class="sys-card">
+          <div class="sys-label">Android App</div>
+          <div class="sys-desc">React Native · Expo SDK 54 · expo-camera</div>
+          <div class="sys-tag">Scan QR in Expo Go</div>
+        </div>
+        <div class="sys-card active">
+          <div class="sys-label">Web Frontend</div>
+          <div class="sys-desc">Node.js · Express · EJS</div>
+          <div class="sys-tag">You are here</div>
+        </div>
+        <div class="sys-card">
+          <div class="sys-label">Backend API</div>
+          <div class="sys-desc">FastAPI · MediaPipe · WebSocket</div>
+          <a href="<%= config.API_BASE %>/health" target="_blank" class="sys-link">Health check →</a>
+        </div>
       </div>
     </section>
   </main>
 
-  <script>
-    function showSection(id) {
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-      document.getElementById('sec-' + id)?.classList.add('active');
-      event.target.classList.add('active');
-    }
-  </script>
 </body>
 </html>

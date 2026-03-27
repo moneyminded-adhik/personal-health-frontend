@@ -3,156 +3,324 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ActiveBharat — Biomechanics Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <title>Personal Health — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/css/dashboard.css">
-  <!-- Dynamic runtime config injected by Express -->
   <script src="/config.js"></script>
 </head>
 <body>
-  <div class="sidebar">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
     <div class="logo">
-      <h1>Active<span>Bharat</span></h1>
-      <p>Project Eklavya</p>
+      <span class="logo-mark">PH</span>
+      <span class="logo-name">Personal Health</span>
     </div>
     <nav class="nav">
-      <a class="nav-item" href="/">🏠 Overview</a>
-      <a class="nav-item active" href="/dashboard">📡 Live Analysis</a>
-      <a class="nav-item" href="/map">🗺️ Eklavya Map</a>
+      <a class="nav-item" href="/">Overview</a>
+      <a class="nav-item active" href="/dashboard">Dashboard</a>
+      <a class="nav-item" href="/map">Map</a>
     </nav>
-    <div class="sidebar-footer">
-      <div class="backend-status">
-        <span class="status-dot <%= backendOnline ? 'online' : 'offline' %>"></span>
-        Backend: <%= backendOnline ? 'Online' : 'Offline' %>
-      </div>
-      <div class="api-url"><%= config.API_BASE %></div>
+    <div class="sidebar-status">
+      <span class="dot <%= backendOnline ? 'green' : 'red' %>"></span>
+      <span><%= backendOnline ? 'Backend online' : 'Backend offline' %></span>
     </div>
-  </div>
+  </aside>
 
-  <div class="main-content">
-    <div class="topbar">
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
       <div>
-        <h2>Live Biomechanics</h2>
-        <p class="topbar-sub">Real-time pose analysis powered by Phase 2 Kinematics</p>
+        <h1>Dashboard</h1>
+        <p class="sub">Live session monitoring &amp; athlete analytics</p>
       </div>
-      <div class="topbar-actions">
-        <select id="sport-select" onchange="setSport(this.value)">
+      <div class="header-actions">
+        <select id="sport-select" onchange="sport = this.value">
           <option value="vertical_jump">Vertical Jump</option>
           <option value="sprint">Sprint</option>
           <option value="squat">Squat</option>
           <option value="push_up">Push Up</option>
           <option value="pull_up">Pull Up</option>
         </select>
-        <button class="btn-primary" onclick="startSession()">▶ Start Session</button>
-        <button class="btn-danger" onclick="endSession()" id="end-btn" style="display:none">■ End</button>
+        <button class="btn" id="start-btn" onclick="startSession()">Start Session</button>
+        <button class="btn btn-stop" id="stop-btn" onclick="endSession()" style="display:none">Stop</button>
       </div>
     </div>
 
-    <!-- Phase 2 Metrics Row -->
-    <div class="metrics-row">
-      <div class="metric-card cyan">
-        <div class="metric-label">Form Score</div>
-        <div class="metric-value" id="form-score">—</div>
-        <div class="metric-sub">/100</div>
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Active Sessions</div>
+        <div class="stat-value mono" id="stat-active">—</div>
       </div>
-      <div class="metric-card orange">
-        <div class="metric-label">Phase-Space DM</div>
-        <div class="metric-value" id="phase-dm">—</div>
-        <div class="metric-sub">Mahalanobis</div>
+      <div class="stat-card">
+        <div class="stat-label">Athletes Registered</div>
+        <div class="stat-value mono" id="stat-athletes">—</div>
       </div>
-      <div class="metric-card green">
-        <div class="metric-label">Torsion Error</div>
-        <div class="metric-value" id="torsion-err">—</div>
-        <div class="metric-sub">degrees</div>
+      <div class="stat-card">
+        <div class="stat-label">AI Model</div>
+        <div class="stat-value mono" id="stat-frames">—</div>
       </div>
-      <div class="metric-card purple">
-        <div class="metric-label">Dimensionless Jerk</div>
-        <div class="metric-value" id="djerk">—</div>
-        <div class="metric-sub">EEI</div>
-      </div>
-      <div class="metric-card red">
-        <div class="metric-label">Heart Rate</div>
-        <div class="metric-value" id="heart-rate">—</div>
-        <div class="metric-sub">bpm rPPG</div>
+      <div class="stat-card">
+        <div class="stat-label">Sessions Total</div>
+        <div class="stat-value mono" id="stat-sessions">—</div>
       </div>
     </div>
 
-    <div class="content-grid">
-      <!-- Live Pose Canvas -->
-      <div class="panel canvas-panel">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Live Pose Feed</div>
-            <div class="panel-sub" id="phase-label">Initialise session to begin</div>
+    <!-- Content Grid -->
+    <div class="grid">
+
+      <!-- Left: Active Phone Sessions + Web Session -->
+      <div class="col-left">
+
+        <!-- Active sessions from the app (auto-refresh) -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <span class="card-title">Active on App</span>
+            <span class="muted small" id="active-refresh-ts"></span>
           </div>
-          <div class="status-pill" id="session-status">Idle</div>
+          <div id="active-phone-list">
+            <div class="empty-state">Loading...</div>
+          </div>
         </div>
-        <canvas id="pose-canvas" width="640" height="480"></canvas>
-        <div class="feedback-banner" id="feedback-banner" style="display:none"></div>
+
+        <!-- Web-started Live Session Panel -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Live Session</span>
+            <span class="badge" id="session-badge">Idle</span>
+          </div>
+          <div id="live-idle" class="empty-state">
+            Start a session to see real-time biomechanics data from the app
+          </div>
+          <div id="live-data" style="display:none">
+            <div class="metric-grid">
+              <div class="metric">
+                <div class="metric-label">Form Score</div>
+                <div class="metric-val mono" id="m-form">—</div>
+                <div class="metric-unit">/ 100</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Left Knee</div>
+                <div class="metric-val mono" id="m-knee-l">—</div>
+                <div class="metric-unit">deg</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Right Knee</div>
+                <div class="metric-val mono" id="m-knee-r">—</div>
+                <div class="metric-unit">deg</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Hip Angle L</div>
+                <div class="metric-val mono" id="m-hip-l">—</div>
+                <div class="metric-unit">deg</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Hip Angle R</div>
+                <div class="metric-val mono" id="m-hip-r">—</div>
+                <div class="metric-unit">deg</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Spine Lean</div>
+                <div class="metric-val mono" id="m-spine">—</div>
+                <div class="metric-unit">deg</div>
+              </div>
+            </div>
+            <div id="feedback-bar" class="feedback-bar" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Recent Sessions -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <span class="card-title">Recent Sessions</span>
+            <button class="link-btn" onclick="loadSessions()">Refresh</button>
+          </div>
+          <div id="sessions-list">
+            <div class="empty-state">Loading...</div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Angle Gauges -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Joint Angles</div>
-        </div>
-        <div class="angle-grid">
-          <div class="angle-item">
-            <div class="angle-label">Left Knee</div>
-            <div class="angle-value" id="a-knee-l">—°</div>
-          </div>
-          <div class="angle-item">
-            <div class="angle-label">Right Knee</div>
-            <div class="angle-value" id="a-knee-r">—°</div>
-          </div>
-          <div class="angle-item">
-            <div class="angle-label">Left Hip</div>
-            <div class="angle-value" id="a-hip-l">—°</div>
-          </div>
-          <div class="angle-item">
-            <div class="angle-label">Right Hip</div>
-            <div class="angle-value" id="a-hip-r">—°</div>
-          </div>
-          <div class="angle-item">
-            <div class="angle-label">Spine Lean</div>
-            <div class="angle-value" id="a-spine">—°</div>
-          </div>
-          <div class="angle-item">
-            <div class="angle-label">Left Ankle</div>
-            <div class="angle-value" id="a-ankle-l">—°</div>
-          </div>
-        </div>
+      <!-- Right: Leaderboard + Athletes -->
+      <div class="col-right">
 
         <!-- Leaderboard -->
-        <div class="panel-header" style="margin-top:24px">
-          <div class="panel-title">Leaderboard</div>
-          <div class="sport-tabs">
-            <button class="sport-tab active" onclick="filterLB('all', this)">All</button>
-            <button class="sport-tab" onclick="filterLB('vertical_jump', this)">Jump</button>
-            <button class="sport-tab" onclick="filterLB('sprint', this)">Sprint</button>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Leaderboard</span>
+            <div class="tab-group">
+              <button class="tab active" onclick="setLBFilter('all',this)">All</button>
+              <button class="tab" onclick="setLBFilter('vertical_jump',this)">Jump</button>
+              <button class="tab" onclick="setLBFilter('sprint',this)">Sprint</button>
+            </div>
+          </div>
+          <div id="leaderboard-list">
+            <div class="empty-state">Loading...</div>
           </div>
         </div>
-        <div id="leaderboard-list"></div>
+
+        <!-- Athletes -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <span class="card-title">Athletes</span>
+            <span class="muted" id="athlete-count"></span>
+          </div>
+          <div id="athlete-list">
+            <div class="empty-state">Loading...</div>
+          </div>
+        </div>
+
       </div>
     </div>
-  </div>
+  </main>
 
   <script>
-    // ── Runtime config injected server-side via window.AB_CONFIG ──
-    const API_BASE = window.AB_CONFIG?.API_BASE || 'http://localhost:8083/api';
-    const WS_BASE  = window.AB_CONFIG?.WS_BASE  || 'ws://localhost:8082';
+    const API_BASE = window.AB_CONFIG?.API_BASE || '/api';
+    const WS_BASE  = `ws://${window.location.hostname}:${window.AB_CONFIG?.PROXY_PORT || 8083}/ws`;
 
     let sessionId = null;
-    let ws        = null;
-    let sport     = 'vertical_jump';
+    let ws = null;
+    let sport = 'vertical_jump';
+    let lbFilter = 'all';
 
-    const ATHLETES = [
-      { name: 'Arjun Patel',  tier: 'Elite',     sport: 'Vertical Jump', bpi: 12450, initials: 'AP' },
-      { name: 'Priya Sharma', tier: 'Advanced',   sport: 'Sprint',        bpi: 11200, initials: 'PS' },
-      { name: 'Rahul Kumar',  tier: 'Elite',      sport: 'Squat',         bpi: 10850, initials: 'RK' },
-      { name: 'Neha Singh',   tier: 'Developing', sport: 'Sprint',        bpi: 9300,  initials: 'NS' },
-    ];
+    // ── Fetch helpers ──────────────────────────────────────────────────────────
+    async function get(path) {
+      try {
+        const r = await fetch(API_BASE + path);
+        return r.ok ? r.json() : null;
+      } catch { return null; }
+    }
 
+    // ── Stats Row — uses /health (single call, most reliable) ─────────────────
+    async function loadStats() {
+      const [health, active] = await Promise.all([
+        get('/health'),
+        get('/sessions/active'),
+      ]);
+      document.getElementById('stat-active').textContent  = active?.count ?? '0';
+      document.getElementById('stat-athletes').textContent = health?.athletes_count ?? '0';
+      document.getElementById('stat-sessions').textContent = health?.sessions_count ?? '0';
+      const modelEl = document.getElementById('stat-frames');
+      if (health?.model_ready) {
+        modelEl.textContent = 'Ready';
+        modelEl.style.color = '#22c55e';
+      } else {
+        modelEl.textContent = 'Not trained';
+        modelEl.style.color = '#64748b';
+      }
+    }
+
+    // ── Active phone sessions — shows what athletes are doing right now ────────
+    async function loadActiveSessions() {
+      const data = await get('/sessions/active');
+      const panel = document.getElementById('active-phone-list');
+      const sessions = data?.active_sessions || [];
+      if (!sessions.length) {
+        panel.innerHTML = '<div class="empty-state">No active sessions — start one from the app</div>';
+        return;
+      }
+      panel.innerHTML = sessions.map(s => `
+        <div class="lb-row">
+          <span class="lb-avatar">${(s.athlete_id||'?')[0].toUpperCase()}</span>
+          <div class="lb-info">
+            <div class="lb-name">${s.athlete_id || 'Unknown'}</div>
+            <div class="lb-meta">${s.sport || '—'} · ${s.frame_count ?? 0} frames</div>
+          </div>
+          <span class="lb-score">${s.latest_score != null ? s.latest_score.toFixed(1) : '—'}</span>
+        </div>`).join('');
+    }
+
+    // ── Leaderboard — data.leaderboard (not data.athletes) ────────────────────
+    let _leaderboard = [];
+
+    async function loadLeaderboard() {
+      const data = await get('/leaderboard');
+      _leaderboard = data?.leaderboard || [];
+      renderLeaderboard();
+    }
+
+    function setLBFilter(f, el) {
+      lbFilter = f;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      renderLeaderboard();
+    }
+
+    function renderLeaderboard() {
+      const list = document.getElementById('leaderboard-list');
+      let rows = _leaderboard;
+      if (lbFilter !== 'all') {
+        rows = rows.filter(a => (a.sport || '').toLowerCase().includes(lbFilter.split('_')[0]));
+      }
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty-state">No athletes yet — register from the app</div>';
+        return;
+      }
+      list.innerHTML = rows.slice(0, 8).map((a, i) => `
+        <div class="lb-row">
+          <span class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${a.rank ?? i+1}</span>
+          <span class="lb-avatar">${(a.avatar || a.name || a.id || '?')[0].toUpperCase()}</span>
+          <div class="lb-info">
+            <div class="lb-name">${a.name || a.id || 'Unknown'}</div>
+            <div class="lb-meta">${a.sport || '—'} · ${a.tier || 'Athlete'}</div>
+          </div>
+          <span class="lb-score">${a.bpi != null ? a.bpi.toLocaleString() : '—'}</span>
+        </div>`).join('');
+    }
+
+    // ── Athletes — data.athletes (not data directly) ───────────────────────────
+    async function loadAthletes() {
+      const data = await get('/athletes');
+      const list  = document.getElementById('athlete-list');
+      const athletes = data?.athletes || [];
+      if (!athletes.length) {
+        list.innerHTML = '<div class="empty-state">No athletes registered</div>';
+        document.getElementById('athlete-count').textContent = '';
+        return;
+      }
+      document.getElementById('athlete-count').textContent = `${data.total} registered`;
+      list.innerHTML = athletes.slice(0, 6).map(a => `
+        <div class="athlete-row">
+          <span class="lb-avatar">${(a.avatar || a.name || a.id || '?')[0].toUpperCase()}</span>
+          <div class="lb-info">
+            <div class="lb-name">${a.name || a.id}</div>
+            <div class="lb-meta">${a.sport || '—'} · ${a.tier || 'Athlete'}</div>
+          </div>
+          <span class="muted small">${a.sessions != null ? a.sessions + ' sessions' : ''}</span>
+        </div>`).join('');
+    }
+
+    // ── Sessions table — data.sessions ─────────────────────────────────────────
+    async function loadSessions() {
+      const data = await get('/sessions?limit=8&status=completed');
+      const list = document.getElementById('sessions-list');
+      const sessions = data?.sessions || [];
+      if (!sessions.length) {
+        list.innerHTML = '<div class="empty-state">No completed sessions yet</div>';
+        return;
+      }
+      list.innerHTML = `
+        <table class="table">
+          <thead><tr><th>ID</th><th>Athlete</th><th>Sport</th><th>Frames</th><th>Avg Score</th></tr></thead>
+          <tbody>${sessions.map(s => {
+            const score = s.summary?.avg_form_score ?? null;
+            return `<tr>
+              <td class="mono small">${(s.session_id||'').slice(0,10)}…</td>
+              <td>${s.athlete_id || '—'}</td>
+              <td>${s.sport || '—'}</td>
+              <td>${s.frame_count ?? '—'}</td>
+              <td>${score != null ? score.toFixed(1) : '—'}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // ── Live Session ───────────────────────────────────────────────────────────
     async function startSession() {
       try {
         const r = await fetch(`${API_BASE}/session/start`, {
@@ -160,85 +328,78 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sport, athlete_id: 'web_dashboard' }),
         });
+        if (!r.ok) throw new Error();
         const d = await r.json();
         sessionId = d.session_id;
-        document.getElementById('session-status').textContent = 'Live';
-        document.getElementById('session-status').className = 'status-pill live';
-        document.getElementById('end-btn').style.display = 'inline-flex';
-        openWebSocket();
-      } catch (e) {
-        alert('Could not connect to backend. Is it running?\n' + API_BASE);
+        setBadge('Live', true);
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'inline-flex';
+        document.getElementById('live-idle').style.display = 'none';
+        document.getElementById('live-data').style.display = 'block';
+        openWS();
+        loadStats();
+      } catch {
+        alert('Cannot connect to backend. Start the Python server first.');
       }
     }
 
-    function openWebSocket() {
+    async function endSession() {
+      if (sessionId) {
+        await fetch(`${API_BASE}/session/${sessionId}/end`, { method: 'POST' }).catch(() => {});
+      }
+      ws?.close(); ws = null; sessionId = null;
+      setBadge('Idle', false);
+      document.getElementById('start-btn').style.display = 'inline-flex';
+      document.getElementById('stop-btn').style.display = 'none';
+      document.getElementById('live-idle').style.display = 'block';
+      document.getElementById('live-data').style.display = 'none';
+      loadStats(); loadSessions();
+    }
+
+    function openWS() {
       if (!sessionId) return;
-      const wsUrl = `${WS_BASE}/metrics/live/${sessionId}`;
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(`${WS_BASE}/metrics/live/${sessionId}`);
       ws.onmessage = (e) => {
         const d = JSON.parse(e.data);
-        document.getElementById('form-score').textContent = d.form_score?.toFixed(1) ?? '—';
-        document.getElementById('phase-dm').textContent   = d.phase_space_dm?.toFixed(3) ?? '—';
-        document.getElementById('torsion-err').textContent = d.torsion_error?.toFixed(1) ?? '—';
-        document.getElementById('djerk').textContent       = d.dimensionless_jerk?.toFixed(4) ?? '—';
-        document.getElementById('heart-rate').textContent = d.heart_rate ?? '—';
-        document.getElementById('a-knee-l').textContent   = d.knee_angle_l ? d.knee_angle_l.toFixed(1) + '°' : '—°';
-        document.getElementById('a-knee-r').textContent   = d.knee_angle_r ? d.knee_angle_r.toFixed(1) + '°' : '—°';
-        document.getElementById('a-hip-l').textContent    = d.hip_angle_l  ? d.hip_angle_l.toFixed(1)  + '°' : '—°';
-        document.getElementById('a-hip-r').textContent    = d.hip_angle_r  ? d.hip_angle_r.toFixed(1)  + '°' : '—°';
-        document.getElementById('a-spine').textContent    = d.spine_lean   ? d.spine_lean.toFixed(1)   + '°' : '—°';
-        document.getElementById('a-ankle-l').textContent  = d.ankle_angle_l ? d.ankle_angle_l.toFixed(1) + '°' : '—°';
-        document.getElementById('phase-label').textContent = d.phase || '';
+        set('m-form',   d.form_score?.toFixed(1));
+        set('m-knee-l', d.knee_angle_l?.toFixed(1));
+        set('m-knee-r', d.knee_angle_r?.toFixed(1));
+        set('m-hip-l',  d.hip_angle_l?.toFixed(1));
+        set('m-hip-r',  d.hip_angle_r?.toFixed(1));
+        set('m-spine',  d.spine_lean?.toFixed(1));
         if (d.primary_feedback) {
-          const fb = document.getElementById('feedback-banner');
+          const fb = document.getElementById('feedback-bar');
           fb.textContent = d.primary_feedback;
           fb.style.display = 'block';
         }
       };
-      ws.onerror = () => console.error('[WS] connection error');
+      ws.onerror = () => {}; // silent
     }
 
-    async function endSession() {
-      if (!sessionId) return;
-      await fetch(`${API_BASE}/session/${sessionId}/end`, { method: 'POST' });
-      ws?.close();
-      sessionId = null;
-      document.getElementById('session-status').textContent = 'Idle';
-      document.getElementById('session-status').className = 'status-pill';
-      document.getElementById('end-btn').style.display = 'none';
+    function set(id, val) {
+      document.getElementById(id).textContent = val ?? '—';
     }
 
-    function setSport(s) { sport = s; }
-
-    function renderLeaderboard(athletes, filter = 'all') {
-      const list = document.getElementById('leaderboard-list');
-      const sorted = athletes
-        .filter(a => filter === 'all' || a.sport.toLowerCase().includes(filter.split('_')[0]))
-        .sort((a, b) => b.bpi - a.bpi);
-      list.innerHTML = sorted.map((a, i) => `
-        <div class="lb-row">
-          <div class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</div>
-          <div class="lb-avatar">${a.initials}</div>
-          <div class="lb-info"><div class="lb-name">${a.name}</div><div class="lb-sport">${a.tier} · ${a.sport}</div></div>
-          <div class="lb-bpi">${a.bpi.toLocaleString()}</div>
-        </div>`).join('');
+    function setBadge(text, live) {
+      const b = document.getElementById('session-badge');
+      b.textContent = text;
+      b.className = live ? 'badge badge-live' : 'badge';
     }
 
-    function filterLB(sport, el) {
-      document.querySelectorAll('.sport-tab').forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
-      renderLeaderboard(ATHLETES, sport);
-    }
-
-    // Init idle canvas
+    // ── Init ──────────────────────────────────────────────────────────────────
     window.onload = () => {
-      renderLeaderboard(ATHLETES);
-      const canvas = document.getElementById('pose-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'rgba(6,182,212,0.3)';
-      ctx.font = '14px Inter'; ctx.textAlign = 'center';
-      ctx.fillText('Initialise session to start live analysis', canvas.width / 2, canvas.height / 2);
+      loadStats();
+      loadActiveSessions();
+      loadLeaderboard();
+      loadAthletes();
+      loadSessions();
+      setInterval(() => {
+        loadStats();
+        loadActiveSessions();
+        document.getElementById('active-refresh-ts').textContent =
+          'updated ' + new Date().toLocaleTimeString();
+      }, 10000);
+      setInterval(loadLeaderboard, 30000);
     };
   </script>
 </body>
