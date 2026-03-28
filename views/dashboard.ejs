@@ -6,6 +6,7 @@
   <title>Personal Health — Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/css/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="/config.js"></script>
 </head>
 <body>
@@ -128,6 +129,7 @@
                 <div class="metric-unit">deg</div>
               </div>
             </div>
+            <canvas id="live-score-chart" height="60" style="width:100%;margin-top:12px;display:none;"></canvas>
             <div id="feedback-bar" class="feedback-bar" style="display:none"></div>
           </div>
         </div>
@@ -178,6 +180,16 @@
     </div>
   </main>
 
+  <!-- Progress slide panel (C3) -->
+  <div id="progress-panel" style="position:fixed;top:0;right:-400px;width:380px;height:100vh;background:#111827;border-left:1px solid rgba(51,65,85,0.6);z-index:200;display:flex;flex-direction:column;transition:right 0.3s ease;overflow-y:auto;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <span style="font-size:16px;font-weight:800;color:#f1f5f9;" id="panel-athlete-name">Athlete</span>
+      <button onclick="closePanel()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div id="panel-content"><div class="empty-state">Loading...</div></div>
+  </div>
+  <div id="panel-overlay" onclick="closePanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;"></div>
+
   <script>
     const API_BASE = window.AB_CONFIG?.API_BASE || '/api';
     const WS_BASE  = `ws://${window.location.hostname}:${window.AB_CONFIG?.PROXY_PORT || 8083}/ws`;
@@ -186,6 +198,36 @@
     let ws = null;
     let sport = 'vertical_jump';
     let lbFilter = 'all';
+    let liveChart = null;
+    const liveScoreHistory = [];
+
+    function initLiveChart() {
+      const canvas = document.getElementById('live-score-chart');
+      canvas.style.display = 'block';
+      liveChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: Array(20).fill(''),
+          datasets: [{ data: Array(20).fill(null), borderColor: '#06b6d4', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: false }]
+        },
+        options: {
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
+          responsive: true, maintainAspectRatio: false,
+        }
+      });
+    }
+
+    function updateLiveChart(score) {
+      if (!liveChart) return;
+      liveScoreHistory.push(score);
+      if (liveScoreHistory.length > 20) liveScoreHistory.shift();
+      const padded = Array(20).fill(null);
+      liveScoreHistory.forEach((v, i) => { padded[20 - liveScoreHistory.length + i] = v; });
+      liveChart.data.datasets[0].data = padded;
+      liveChart.update('none');
+    }
 
     // ── Fetch helpers ──────────────────────────────────────────────────────────
     async function get(path) {
@@ -261,7 +303,7 @@
         return;
       }
       list.innerHTML = rows.slice(0, 8).map((a, i) => `
-        <div class="lb-row">
+        <div class="lb-row" style="cursor:pointer;" onclick="openAthletePanel('${(a.id||a.athlete_id||'').replace(/'/g,"\\'")}','${(a.name||a.id||'').replace(/'/g,"\\'")}')">
           <span class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${a.rank ?? i+1}</span>
           <span class="lb-avatar">${(a.avatar || a.name || a.id || '?')[0].toUpperCase()}</span>
           <div class="lb-info">
@@ -284,7 +326,7 @@
       }
       document.getElementById('athlete-count').textContent = `${data.total} registered`;
       list.innerHTML = athletes.slice(0, 6).map(a => `
-        <div class="athlete-row">
+        <div class="athlete-row" style="cursor:pointer;" onclick="openAthletePanel('${(a.id||a.athlete_id||'').replace(/'/g,"\\'")}','${(a.name||a.id||'').replace(/'/g,"\\'")}')">
           <span class="lb-avatar">${(a.avatar || a.name || a.id || '?')[0].toUpperCase()}</span>
           <div class="lb-info">
             <div class="lb-name">${a.name || a.id}</div>
@@ -336,6 +378,7 @@
         document.getElementById('stop-btn').style.display = 'inline-flex';
         document.getElementById('live-idle').style.display = 'none';
         document.getElementById('live-data').style.display = 'block';
+        initLiveChart();
         openWS();
         loadStats();
       } catch {
@@ -348,6 +391,9 @@
         await fetch(`${API_BASE}/session/${sessionId}/end`, { method: 'POST' }).catch(() => {});
       }
       ws?.close(); ws = null; sessionId = null;
+      if (liveChart) { liveChart.destroy(); liveChart = null; }
+      liveScoreHistory.length = 0;
+      document.getElementById('live-score-chart').style.display = 'none';
       setBadge('Idle', false);
       document.getElementById('start-btn').style.display = 'inline-flex';
       document.getElementById('stop-btn').style.display = 'none';
@@ -361,6 +407,7 @@
       ws = new WebSocket(`${WS_BASE}/metrics/live/${sessionId}`);
       ws.onmessage = (e) => {
         const d = JSON.parse(e.data);
+        if (d.form_score != null) updateLiveChart(d.form_score);
         set('m-form',   d.form_score?.toFixed(1));
         set('m-knee-l', d.knee_angle_l?.toFixed(1));
         set('m-knee-r', d.knee_angle_r?.toFixed(1));
@@ -378,6 +425,59 @@
 
     function set(id, val) {
       document.getElementById(id).textContent = val ?? '—';
+    }
+
+    // ── Progress Panel ──────────────────────────────────────────────────────────
+    async function openAthletePanel(athleteId, name) {
+      document.getElementById('panel-athlete-name').textContent = name || athleteId;
+      document.getElementById('panel-content').innerHTML = '<div class="empty-state">Loading...</div>';
+      document.getElementById('progress-panel').style.right = '0';
+      document.getElementById('panel-overlay').style.display = 'block';
+      const data = await get(`/athlete/${athleteId}/progress`);
+      if (!data) {
+        document.getElementById('panel-content').innerHTML = '<div class="empty-state">Could not load progress</div>';
+        return;
+      }
+      const trend = data.form_trend || [];
+      const imp = data.improvement_pct ?? 0;
+      const impColor = imp >= 0 ? '#22c55e' : '#ef4444';
+      const jointRows = Object.entries(data.joint_averages || {}).map(([k, v]) =>
+        `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;">
+          <span style="color:#94a3b8;">${k.replace(/_/g,' ')}</span>
+          <span style="color:#f1f5f9;font-weight:700;">${v}°</span>
+        </div>`
+      ).join('');
+      document.getElementById('panel-content').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;">
+            <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Improvement</div>
+            <div style="font-size:22px;font-weight:900;color:${impColor};">${imp > 0 ? '+' : ''}${imp}%</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;">
+            <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">This Week</div>
+            <div style="font-size:22px;font-weight:900;color:#06b6d4;">${data.sessions_this_week ?? 0}</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Form Trend (${trend.length} sessions)</div>
+        <div style="height:60px;margin-bottom:16px;">
+          <canvas id="panel-trend-chart" height="60" style="width:100%;"></canvas>
+        </div>
+        <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Joint Averages</div>
+        ${jointRows || '<div style="color:#64748b;font-size:12px;">No joint data yet</div>'}
+      `;
+      if (trend.length > 1 && typeof Chart !== 'undefined') {
+        const ctx = document.getElementById('panel-trend-chart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: { labels: trend.map(t => t.date), datasets: [{ data: trend.map(t => t.avg_form_score), borderColor: '#06b6d4', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: false }] },
+          options: { animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } }, responsive: true, maintainAspectRatio: false }
+        });
+      }
+    }
+
+    function closePanel() {
+      document.getElementById('progress-panel').style.right = '-400px';
+      document.getElementById('panel-overlay').style.display = 'none';
     }
 
     function setBadge(text, live) {
