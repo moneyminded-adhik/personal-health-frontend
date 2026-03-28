@@ -326,4 +326,20 @@ main {
   .system-grid { grid-template-columns: 1fr; }
   .stats-row { gap: 16px; }
   .nav-links { display: none; }
+  .btn-nav { display: none; }
+}
+
+@media (max-width: 480px) {
+  .navbar { padding: 0 0.75rem; height: 52px; }
+  .hero { padding: 40px 1rem 28px; }
+  .hero h1 { font-size: 1.6rem; }
+  .hero p { font-size: 0.9rem; }
+  .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 1rem; }
+  .stat-val { font-size: 1.6rem; }
+  .features { grid-template-columns: 1fr; padding: 0 1rem; }
+  .feature-card { padding: 20px; }
+  .leaderboard { padding: 0 1rem; }
+  .lb-table { font-size: 12px; }
+  .system-grid { grid-template-columns: 1fr; padding: 0 1rem; }
+  .btn-nav { display: none; }
 }

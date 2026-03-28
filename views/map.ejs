@@ -94,7 +94,7 @@
     }
 
     function loadPlayfields(lat, lng) {
-      fetch(`${API_BASE}/playfields?lat=${lat}&lng=${lng}&radius=5`)
+      fetch(`${API_BASE}/playfields?lat=${lat}&lng=${lng}&radius=50`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           const fields = data?.playfields || data?.fields || [];
@@ -107,7 +107,7 @@
             const lng = f.lng || f.longitude;
             if (!lat || !lng) return;
             const m = L.marker([lat, lng], { icon: makeFieldIcon(f.name || 'Field') })
-              .bindPopup(`<b>${f.name || 'Sports Field'}</b><br>${f.type || ''}`);
+              .bindPopup(`<b>${f.name || 'Sports Field'}</b><br>${f.city || ''} · ${f.distance_km != null ? f.distance_km.toFixed(1) + ' km away' : ''}<br><small>${(f.sports || []).join(', ')}</small>`);
             fieldMarkers.push(m);
             m.addTo(map);
           });
